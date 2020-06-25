@@ -1,0 +1,47 @@
+#Read CSV, detect datatype of columns, cols length and form create DDL.
+import pandas as pd
+import csv 
+
+lengths = {}
+csvfile = open('qPBI_Exp_Ship_Act_Avg.csv','r')
+csv_data = csv.reader(csvfile)
+for row in csv_data:
+    for colno, col in enumerate(row):
+        lengths[colno] = max(len(col), lengths.get(colno, 0))
+#print(lengths)
+csvfile.close()
+with open('qPBI_Exp_Ship_Act_Avg.csv','r') as csv_file:
+    #data = pd.read_csv(csv_file) 
+    csv_data = pd.read_csv(csv_file)
+    cols=list(csv_data)
+    cols_dtype=csv_data.dtypes
+    t=12
+    i=0
+    while i < t:
+        #print(cols[i])
+        #print(cols_dtype[i])
+        i = i+1
+    #print(cols)
+
+
+    #Forming create statment
+    
+    i=0
+    while i < t:
+        temp = lengths[i]
+        #print(temp)
+        i=i+1
+    
+statement = 'create table stack_overflow_survey ('
+i=0
+while i < t:
+#for i in range(len(headers)):
+    if cols_dtype[i] == 'object':
+        statement = (statement + '\n{} varchar({}),').format(cols[i], str(lengths[i]))
+    else:
+        statement = (statement + '\n' + '{} {}' + ',').format(cols[i], cols_dtype[i])
+    i=i+1
+statement = statement[:-1] + ');'
+print(statement)
+    
+    
