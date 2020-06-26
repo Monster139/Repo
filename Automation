@@ -45,3 +45,58 @@ statement = statement[:-1] + ');'
 print(statement)
     
     
+#---------------------------------------------------------------------------------------------
+
+#Read CSV, detect datatype of columns, cols length and form create DDL.
+import pandas as pd
+import csv 
+
+lengths = {}
+ncol=0
+csvfile = open('qPBI_Exp_Ship_Act_Avg.csv','r')
+
+#Count total number of columns
+csv_data = csv.reader(csvfile)
+first_line = csvfile.readline()
+ncol = first_line.count(',') + 1
+#print("ncol:",ncol)
+
+#Get the maximum length of each column's value
+for row in csv_data:
+    for colno, col in enumerate(row):
+        lengths[colno] = max(len(col), lengths.get(colno, 0))
+#print(lengths)
+csvfile.close()
+
+with open('qPBI_Exp_Ship_Act_Avg.csv','r') as csv_file:
+    csv_data = pd.read_csv(csv_file)
+    cols=list(csv_data)
+    cols_dtype=csv_data.dtypes
+    #t=ncol
+    i=0
+    #while i < ncol:
+        #print(cols[i])
+        #print(cols_dtype[i])
+    #    i = i+1
+    #print(cols)
+
+
+    #Forming create statment
+    
+    #i=0
+    #while i < ncol:
+     #   temp = lengths[i]
+        #print(temp)
+    #    i=i+1
+    
+statement = 'create table VendorAddress_en_vndad_tbl ('
+i=0
+while i < ncol:
+#for i in range(len(headers)):
+    if cols_dtype[i] == 'object':
+        statement = (statement + '\n{} varchar({}),').format(cols[i], str(lengths[i]+10))
+    else:
+        statement = (statement + '\n' + '{} {}' + ',').format(cols[i], cols_dtype[i])
+    i=i+1
+statement = statement[:-1] + ');'
+print(statement)
