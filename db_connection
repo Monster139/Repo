@@ -66,3 +66,11 @@ def connect():
 
 if __name__ == '__main__':
     connect()
+#--------database.ini------------------------------------------
+#database.ini
+[postgresql]
+host=hcigdw-cluster-1.chpqvsunpl9q.us-east-2.redshift.amazonaws.com
+port=5439
+database=hcigdw
+user=awsuser
+password=M9sterr3dsh1ft!#
