@@ -29,7 +29,7 @@ def connect():
         print('Connecting to the PostgreSQL database...\n')
         conn = psycopg2.connect(**params)
 		
-        # create a cursor
+        # create a cursor 
         cur = conn.cursor()
         
 	# execute a statement
