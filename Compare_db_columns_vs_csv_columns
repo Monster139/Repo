@@ -1,0 +1,128 @@
+# 
+import psycopg2
+import pandas as pd
+import csv 
+import boto3
+
+#from config import config
+from configparser import ConfigParser
+
+def config(filename='database.ini', section='postgresql'):
+    # create a parser
+    parser = ConfigParser()
+    # read config file
+    parser.read(filename)
+
+    # get section, default to postgresql
+    db = {}
+    if parser.has_section(section):
+        params = parser.items(section)
+        for param in params:
+            db[param[0]] = param[1]
+    else:
+        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+    return db
+    
+def connect():
+    """ Connect to the PostgreSQL database server """
+    conn = None
+    try:
+        # read connection parameters
+        params = config()
+
+        # connect to the PostgreSQL server
+        print('Connecting to the PostgreSQL database...\n')
+        conn = psycopg2.connect(**params)
+		
+        # create a cursor
+        cur = conn.cursor()
+        
+	# execute a statement
+        #print('PostgreSQL database version:')
+        #cur.execute('SELECT version()')
+        
+        cur.execute('select * from elt.elt_company_config;')
+        company_config = cur.fetchall()
+        #print(company_config)
+        access_key = company_config[0][2]
+        secret_key = company_config[0][3]
+        print("access_key:",access_key)
+        print("secret_key:",secret_key)
+        
+        cur.execute('select * from elt.elt_table_config;')
+        table_config = cur.fetchall()
+        #print(table_config)
+        fileName = table_config[0][2]
+        filePath = table_config[0][3]
+        print("\nfileName:",fileName)
+        print("filePath:",filePath)
+        new_path=filePath+fileName
+        print("\nPath:",new_path)
+        #s3 = boto3.resource('s3')
+        #s3 = boto3.client('s3', aws_access_key_id=... , aws_secret_access_key=...)
+        #s3.download_file('your_bucket','k.png','/Users/username/Desktop/k.png')
+        #s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        #s3.download_file('adageextract182018','gl_acct_tbl.csv','//Downloads/gl_acct_tbl.csv')
+        
+        # close the communication with the PostgreSQL
+        cur.execute("select distinct * from public.elt_ddl_model where data_type!='';")
+        columns_bucket = cur.fetchall()
+        #cur.execute("select count(*) from  (select distinct * from public.elt_ddl_model where data_type!='');")
+        #db_columns_count = cur.fetchall()
+        #print("test:",db_columns_count)
+        
+        #print("columnName:{}, Data_Type: {}",columns_bucket[i][0],columns_bucket[i][1])
+        #columns_bucket =[element.lower() for element in columns_bucket]
+        lengths = {}
+        file_col_count=0
+        csvfile = open('VendorAddress_en_vndad_tbl.xlsx.csv','r')
+        
+        #Count total number of columns
+        csv_data = csv.reader(csvfile)
+        first_line = csvfile.readline()
+        file_col_count = first_line.count(',') + 1
+        #print("file_col_count:",file_col_count)
+        
+        #Get the maximum length of each column's value
+        for row in csv_data:
+            for colno, col in enumerate(row):
+                lengths[colno] = max(len(col), lengths.get(colno, 0))
+        #print(lengths)
+        csvfile.close()
+        
+        with open('VendorAddress_en_vndad_tbl.xlsx.csv','r') as csv_file:
+            csv_data = pd.read_csv(csv_file)
+            cols_list=list(csv_data)
+            cols_list = [element.lower() for element in cols_list]
+            cols_dtype=csv_data.dtypes
+            #print("first_column:",columns_bucket[0][0],columns_bucket[0][1])
+            outer_count=0
+            inner_count=0
+            colName = []
+            for item in columns_bucket:
+                colName.append(item[0])
+            #print(colName)
+            counter=0
+            temp = []
+            for item in colName:
+                if item in cols_list:
+                    if item not in temp:
+                        temp.append(item)
+                        counter = counter+1
+            print("counter:",counter)
+            print("matched columns:",temp)
+                           
+        cur.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+            print('\nDatabase connection closed.')
+    
+    #columns_bucket1 =connect()
+    
+
+
+if __name__ == '__main__':
+    connect()
