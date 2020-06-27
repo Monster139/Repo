@@ -126,3 +126,26 @@ def connect():
 
 if __name__ == '__main__':
     connect()
+
+############ Data type Index catch
+
+counter=0
+            temp = []
+            i = []
+            j=0
+            while j<9553:
+            
+                if columns_bucket[j][0] in cols_list:
+                    if columns_bucket[j][0] not in temp:
+                        temp1 = columns_bucket[j][0]
+                        temp.append(temp1)
+                        i.append(j)
+                        counter=counter+1
+                j=j+1
+            print("\ncounter:",counter)
+            print("\nmatched columns:",temp)
+            print("\nMatched Indexes:",i)
+            k=0
+            while k < counter:
+                print("Matched Indexed DT: ",columns_bucket[i[k]][1])
+                k = k+1
