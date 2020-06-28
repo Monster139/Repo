@@ -1,0 +1,210 @@
+import psycopg2
+import pandas as pd
+import csv 
+import boto3
+
+#from config import config
+from configparser import ConfigParser
+
+def config(filename='database.ini', section='postgresql'):
+    # create a parser
+    parser = ConfigParser()
+    # read config file
+    parser.read(filename)
+
+    # get section, default to postgresql
+    db = {}
+    if parser.has_section(section):
+        params = parser.items(section)
+        for param in params:
+            db[param[0]] = param[1]
+    else:
+        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
+    return db
+    
+def connect():
+    """ Connect to the PostgreSQL database server """
+    conn = None
+    try:
+        # read connection parameters
+        params = config()
+
+        # connect to the PostgreSQL server
+        print('Connecting to the PostgreSQL database...\n')
+        conn = psycopg2.connect(**params)
+		
+        # create a cursor
+        cur = conn.cursor()
+        
+	# execute a statement
+        #print('PostgreSQL database version:')
+        #cur.execute('SELECT version()')
+        
+        cur.execute('select * from elt.elt_company_config;')
+        company_config = cur.fetchall()
+        #print(company_config)
+        access_key = company_config[0][2]
+        secret_key = company_config[0][3]
+        print("access_key:",access_key)
+        print("secret_key:",secret_key)
+                
+        cur.execute('select * from elt.elt_table_config;')
+        table_config = cur.fetchall()
+        #print(table_config)
+        fileName = table_config[0][2]
+        filePath = table_config[0][3]
+        tableName = table_config[0][5]
+        column_count = table_config[0][6]
+        print("\nfileName:",fileName)
+        print("filePath:",filePath)
+        print("tableName:",tableName)
+        print("column_count:",column_count)
+        new_path=filePath+fileName
+        print("\nPath:",new_path)
+        #s3 = boto3.resource('s3')
+        #s3 = boto3.client('s3', aws_access_key_id=... , aws_secret_access_key=...)
+        #s3.download_file('your_bucket','k.png','/Users/username/Desktop/k.png')
+        #s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        #s3.download_file('adageextract182018','gl_acct_tbl.csv','//Downloads/gl_acct_tbl.csv')
+        
+        
+        # close the communication with the PostgreSQL
+        cur.execute("select distinct * from public.elt_ddl_model where data_type!='';")
+        model_columns = cur.fetchall()
+        cur.execute("select distinct table_name from elt.elt_table_ddl_cfg;")
+        ddl_cfg_tableTemp = cur.fetchall()
+        #print("ddl_cfg_tablename:",ddl_cfg_tableTemp[0][0])
+        ddl_cfg_tableName = ddl_cfg_tableTemp[0][0]
+        cur.execute("select distinct column_name from elt.elt_table_ddl_cfg;")
+        ddl_cfg_temp = cur.fetchall()
+        #ddl_cfg_columns = [element.lower() for element[0] in ddl_cfg_columns]
+        col_len=len(ddl_cfg_temp)
+        i=0 
+        ddl_cfg_columns =[]
+        while i<col_len:
+            if ddl_cfg_temp[i][0] not in ddl_cfg_columns:
+                temp = ddl_cfg_temp[i][0].lower()
+                ddl_cfg_columns.append(temp)
+            i=i+1
+        print("ddl_cfg_columns:",ddl_cfg_columns)
+        #print("columnName:{}, Data_Type: {}",model_columns[i][0],model_columns[i][1])
+        #model_columns =[element.lower() for element in model_columns]
+        lengths = {}
+        file_col_count=0
+        csvfile = open('VendorAddress_en_vndad_tbl.xlsx.csv','r')
+        
+        #Count total number of columns
+        csv_data = csv.reader(csvfile)
+        first_line = csvfile.readline()
+        file_col_count = first_line.count(',') + 1
+        print("file_col_count:",file_col_count)
+        
+        #Get the maximum length of each column's value
+        for row in csv_data:
+            for colno, col in enumerate(row):
+                lengths[colno] = max(len(col), lengths.get(colno, 0))
+        #print(lengths)
+        csvfile.close()
+        
+        with open('VendorAddress_en_vndad_tbl.xlsx.csv','r') as csv_file:
+            csv_data = pd.read_csv(csv_file)
+            cols_list=list(csv_data)
+            cols_list = [element.lower() for element in cols_list]
+            cols_dtype=csv_data.dtypes
+            #print("first_column:",model_columns[0][0],model_columns[0][1])
+            #print("first_column:",model_columns)
+            outer_count=0
+            inner_count=0
+            #colName = []
+            #for item in model_columns:
+            #    colName.append(item[0])
+            #print(colName)
+            counter=0
+            matched_column = []
+            index = []
+            j=0
+            while j<9553:
+            
+                if model_columns[j][0] in cols_list:
+                    if model_columns[j][0] not in matched_column:
+                        temp1 = model_columns[j][0]
+                        matched_column.append(temp1)
+                        index.append(model_columns[j][1])
+                        counter=counter+1
+                j=j+1
+            print("\ncounter:",counter)
+            print("\nMatched columns:",matched_column)
+            print("\nRelated Indexes:",index)
+            
+            n = file_col_count - counter
+            print("Column_diff:",n);
+            var_item = 'varchar'
+            i=0
+            lenght1=10
+            config_id = 10000
+            ddl_cfg_id= config_id+1
+            src_schema ='elt'
+            j=1
+            column_seq=2
+            
+            #INSERT for matched columns with model.
+            while i < (file_col_count -n) :
+                if matched_column[i] not in ddl_cfg_columns:
+                    
+                    ddl_cfg_id = ddl_cfg_id + j
+                    column_seq = column_seq + j
+                    insert_statment ="""insert into elt.elt_table_ddl_cfg \
+                                        (ddl_cfg_id,\
+                                        config_id,\
+                                        src_schema,\
+                                        table_name,\
+                                        column_name,\
+                                        column_data_type,\
+                                        column_length,\
+                                        column_seq)\
+                                        values ('{}','{}','{}','{}','{}','{}','{}','{}');"""\
+                                        .format(ddl_cfg_id,config_id,src_schema,ddl_cfg_tableName,matched_column[i], index[i], str(lengths[i]+5),column_seq)
+                    print("matched column insert_statment:\n",insert_statment)
+                    #cur.execute(insert_statment)
+                    #conn.commit()
+                i = i+1
+                
+            #INSERT for non-matched columns from modle
+            for item in cols_list:
+                if item not in matched_column and ddl_cfg_columns:
+                    j=1
+                    ddl_cfg_id = ddl_cfg_id + j
+                    column_seq = column_seq + j
+                    insert_statment ="""insert into elt.elt_table_ddl_cfg \
+                                        (ddl_cfg_id,\
+                                        config_id,\
+                                        src_schema,\
+                                        table_name,\
+                                        column_name,\
+                                        column_data_type,\
+                                        column_length,\
+                                        column_seq)\
+                                        values ('{}','{}','{}','{}','{}','{}','{}','{}');"""\
+                                        .format(ddl_cfg_id,config_id,src_schema,ddl_cfg_tableName,item, var_item, str(lengths[4]+5),column_seq) 
+                    print("non matched insert_statment:\n",insert_statment)
+                    #cur.execute(insert_statment)
+                    #conn.commit()
+                    #cur.execute('''insert into elt.elt_table_ddl_cfg (column_name,column_data_type,column_length) VALUES (%s, %s)''', (matched_column[i], var_item,str(lengths[i]+5)))
+            print("ddl_cfg_id:",ddl_cfg_id)
+#"INSERT INTO public.elt_ddl_model (column_name, data_type)"
+#"VALUES ('{}', '{}');".format(item, var_itemj)
+            
+        cur.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+            print('\nDatabase connection closed.')
+    
+    #model_columns1 =connect()
+    
+
+
+if __name__ == '__main__':
+    connect()
